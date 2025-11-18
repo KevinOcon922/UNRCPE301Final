@@ -10,11 +10,15 @@
 * Notes:
 * Working with ADC channel 0 for water sensor
 * Digital Pins Used:
-* Pin 1 = Start Button
 * Pin 2 = D4 LCD
 * Pin 3 = D5 LCD
 * Pin 4 = D6 LCD
 * Pin 5 = D7 LCD
+* Pin 6 = Error reset button
+* Pin 7 = Green LED
+* Pin 8 = Yellow LED
+* Pin 9 = Red LED
+* Pin 10 = Start/Stop button
 * Pin 11 = RS LCD
 * Pin 12 = EN LCD
 */
@@ -33,6 +37,15 @@ enum State{
   RUNNING
 };
 
+//Digital pin addresses
+volatile unsigned char* pin_b = (unsigned char*) 0x23;
+volatile unsigned char* ddr_b = (unsigned char*) 0x24;
+volatile unsigned char* port_b = (unsigned char*) 0x25;
+
+volatile unsigned char* pin_h = (unsigned char*) 0x100;
+volatile unsigned char* ddr_h = (unsigned char*) 0x101;
+volatile unsigned char* port_h = (unsigned char*) 0x102;
+
 //Serial data registers
 volatile unsigned char *myUCSR0A = (unsigned char *)0x00C0;
 volatile unsigned char *myUCSR0B = (unsigned char *)0x00C1;
@@ -50,22 +63,74 @@ volatile unsigned int* my_ADC_DATA = (unsigned int*) 0x78;
 const int RS = 11, EN = 12, D4 = 2, D5 = 3, D6 = 4, D7 = 5;
 LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 
-State currentState = DISABLED;
+State currentState;
 
-void setup() {
+void setup(){
+  //setup digital pin 10 for input with pullup
+  *ddr_b &= 0xEF;
+  *port_b |= 0x10;
+  //setup digital pin 6 for input with pullup
+  *ddr_h &= 0xF7;
+  *port_h |= 0x08;
+  //setup digital pin 7 for output
+  *ddr_h |= 0x10;
+  //setup digital pin 8 for output
+  *ddr_h |= 0x20;
+  //setup digital pin 9 for output
+  *ddr_h |= 0x40;
+
+  currentState = DISABLED;
+
   U0init(9600);
   adc_init();
   //lcd.begin(16, 2);
+
+  //attach ISR to start/stop button
+  attachInterrupt(digitalPinToInterrupt(10), START_STOP_ISR, RISING);
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
+void loop(){
+  //All states, make sure to report state transitions via serial as well as changed to stepper motor position
 
+  if(currentState != DISABLED){
+    //Monitor humidity and temp and report to LCD once per minute
+    //Check vent position controls
+  }
+
+  if(currentState == IDLE){
+    unsigned int value = adc_read(0);
+    if(value < WATER_THRESHOLD){
+      //Switch to error, make sure to report state transition to serial
+      //turn off motor if on
+      //Display error message on LCD
+      //enable red LED
+      //     ***    Maybe make a transition_to_error function since this has to be done here and during running state
+    }
+  } else if(currentState == ERROR){
+    //Check if a reset button is pressed, and if so, check if water is above threshold and 
+    //if yes, switch back to IDLE
+  } else if(currentState == RUNNING){
+    //make sure fan motor is on when state is transitioned
+    //monitor temperature and switch to IDLE when below threshold
+    //monitor water and transition to error if low
+    //make sure blue LED is on at state transition
+  }
+}
+
+void START_STOP_ISR(){
+  //Also turn off fan if on
+  if(currentState != DISABLED){
+    currentState = DISABLED;
+    //enable yellow LED
+    //also make sure to disable all other LEDS
+  } else {
+    currentState = IDLE;
+    //enable green LED
+  }
 }
 
 //Initializes Arduino for ADC conversion
-void adc_init()
-{
+void adc_init(){
   // setup the A register
   // set bit 7 to 1 to enable the ADC
   *my_ADCSRA |= 0x80; 
@@ -92,8 +157,7 @@ void adc_init()
 }
 
 //Read ADC data
-unsigned int adc_read(unsigned char adc_channel_num)
-{
+unsigned int adc_read(unsigned char adc_channel_num){
   // clear the channel selection bits (MUX 4:0)
   *my_ADMUX &= 0xE0;
   // clear the channel selection bits (MUX 5) hint: it's not in the ADMUX register
@@ -111,8 +175,7 @@ unsigned int adc_read(unsigned char adc_channel_num)
 }
 
 //Initializes Arduino for serial IO
-void U0init(int U0baud)
-{
+void U0init(int U0baud){
   unsigned long FCPU = 16000000;
   unsigned int tbaud;
   tbaud = (FCPU / 16 / U0baud - 1);
@@ -124,20 +187,17 @@ void U0init(int U0baud)
 }
 
 //Returns nonzero value if data is available to read on serial channel 0
-unsigned char U0kbhit()
-{
+unsigned char U0kbhit(){
   return *myUCSR0A & RDA;
 }
 
 //Returns serial data
-unsigned char U0getchar()
-{
+unsigned char U0getchar(){
   return *myUDR0;
 }
 
 //Send a character to serial monitor
-void U0putchar(unsigned char U0pdata)
-{
+void U0putchar(unsigned char U0pdata){
   while((*myUCSR0A & TBE)==0);
   *myUDR0 = U0pdata;
 }
