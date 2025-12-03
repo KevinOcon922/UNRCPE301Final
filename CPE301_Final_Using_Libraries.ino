@@ -1,8 +1,8 @@
 //  ||||| TO FIX |||||
-//  Add stop button
-//  Fix water level sensor being able to change for 5 seconds after reset is pressed (once only)
-//  Add stepper motor change threshold
-//  General revisions and corrections
+//  Add stepper motor change threshold / fix stepper jitter
+//  Add button debouncing
+
+//  For prototype: Replace Blue LED (broken)
 
 #include <LiquidCrystal.h>
 #include <Stepper.h>
@@ -42,6 +42,7 @@ const int POTENTIOMETER_PIN = A1;
 // Input Pins
 const int BUTTON_START_PIN = 2;
 const int BUTTON_RESET_PIN = 3;
+const int BUTTON_STOP_PIN  = 4;
 
 // LED Pins
 const int LED_YELLOW = 22;
@@ -84,8 +85,9 @@ void setup(){
   pinMode(LED_BLUE, OUTPUT);
 
   // Input Pins
-  pinMode(BUTTON_START_PIN, INPUT); 
+  pinMode(BUTTON_START_PIN, INPUT);
   pinMode(BUTTON_RESET_PIN, INPUT);
+  pinMode(BUTTON_STOP_PIN,  INPUT);
 
   lcd.begin(16, 2);
   dht.begin();
@@ -116,6 +118,7 @@ void loop(){
 
   if(digitalRead(BUTTON_RESET_PIN) == HIGH){
     resetButtonPressed = true;
+    Serial.println("RESET");
   }
 
   // Vent Control
@@ -161,6 +164,11 @@ void idleMonitoring() {
     return;
   }
 
+  if(digitalRead(BUTTON_STOP_PIN) == HIGH){
+    transitionTo(DISABLED);
+    return;
+  }
+
   float t = dht.readTemperature();
   if(t > 24.0){
     transitionTo(RUNNING);
@@ -168,6 +176,11 @@ void idleMonitoring() {
 }
 
 void errorMonitoring(){
+  if(digitalRead(BUTTON_STOP_PIN) == HIGH){
+    transitionTo(DISABLED);
+    return;
+  }
+
   if(resetButtonPressed){
     resetButtonPressed = false;
     if(analogRead(WATER_SENSOR_PIN) > 25){
@@ -179,6 +192,11 @@ void errorMonitoring(){
 void runningMonitoring(){
   if(analogRead(WATER_SENSOR_PIN) < 25){
     transitionTo(ERROR);
+    return;
+  }
+
+  if(digitalRead(BUTTON_STOP_PIN) == HIGH){
+    transitionTo(DISABLED);
     return;
   }
 
@@ -248,11 +266,19 @@ void ventControl(){
     int targetPos = map(potVal, 0, 1023, 0, 1278);
     int stepsToMove = targetPos - currentStepperPosition;
     
-    if(stepsToMove != 0) {
+    if(stepsToMove != 0){
       ventMove.step(stepsToMove);
       currentStepperPosition = targetPos;
+      
+      Serial.print("\nVent position changed to ");
+      Serial.print(currentStepperPosition);
+      Serial.print(" at ");
+      DateTime now = rtc.now();
+      Serial.println(now.timestamp());
     }
+
     previousPotValue = potVal;
+
   }
 }
 
@@ -290,4 +316,5 @@ void logEvent(State state) {
 
 void startInterrupt(){
   startButtonPressed = true;
+  Serial.println("START");
 }
