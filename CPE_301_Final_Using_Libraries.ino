@@ -3,73 +3,73 @@
 #include <DHT.h>
 #include <RTClib.h>
 
-// LCD Pins
-const int RS = 37;
-const int EN = 36;
-const int D4 = 35;
-const int D5 = 34;
-const int D6 = 33;
-const int D7 = 32;
-LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
+// PINS
+  // LCD Pins
+  const int RS = 37;
+  const int EN = 36;
+  const int D4 = 35;
+  const int D5 = 34;
+  const int D6 = 33;
+  const int D7 = 32;
+  LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 
-// Stepper Motor Pins
-const int STEP_IN1 = 13;
-const int STEP_IN2 = 12;
-const int STEP_IN3 = 11;
-const int STEP_IN4 = 10;
-const int STEPS_PER_REVOLUTION = 2038;
-Stepper ventMove(STEPS_PER_REVOLUTION, STEP_IN1, STEP_IN3, STEP_IN2, STEP_IN4);
+  // Stepper Motor Pins
+  const int STEP_IN1 = 13;
+  const int STEP_IN2 = 12;
+  const int STEP_IN3 = 11;
+  const int STEP_IN4 = 10;
+  const int STEPS_PER_REVOLUTION = 2038;
+  Stepper ventMove(STEPS_PER_REVOLUTION, STEP_IN1, STEP_IN3, STEP_IN2, STEP_IN4);
 
-// DC Motor Pins
-const int FAN_ENABLE_PIN = 8;
-const int FAN_IN1_PIN    = 7;
-const int FAN_IN2_PIN    = 6;
+  // DC Motor Pins
+  const int FAN_ENABLE_PIN = 8;
+  const int FAN_IN1_PIN    = 7;
+  const int FAN_IN2_PIN    = 6;
 
-// Sensor Pins
-const int DHT_PIN = 5;
-#define DHTTYPE DHT11
-DHT dht(DHT_PIN, DHTTYPE);
+  // Sensor Pins
+  const int DHT_PIN = 5;
+  #define DHTTYPE DHT11
+  DHT dht(DHT_PIN, DHTTYPE);
 
-const int WATER_SENSOR_PIN  = A0; 
-const int POTENTIOMETER_PIN = A1; 
+  const int WATER_SENSOR_PIN  = A0; 
+  const int POTENTIOMETER_PIN = A1; 
 
-// Input Pins
-const int BUTTON_START_PIN = 2;
-const int BUTTON_RESET_PIN = 3;
-const int BUTTON_STOP_PIN  = 4;
+  // Input Pins
+  const int BUTTON_START_PIN = 2;
+  const int BUTTON_RESET_PIN = 3;
+  const int BUTTON_STOP_PIN  = 4;
 
-// LED Pins
-const int LED_YELLOW = 22;
-const int LED_GREEN  = 23;
-const int LED_RED    = 24;
-const int LED_BLUE   = 25;
+  // LED Pins
+  const int LED_YELLOW = 22;
+  const int LED_GREEN  = 23;
+  const int LED_RED    = 24;
+  const int LED_BLUE   = 25;
 
 // RTC
-RTC_DS1307 rtc;
+  RTC_DS1307 rtc;
 
 // States
-enum State{
-  DISABLED,
-  IDLE,
-  ERROR,
-  RUNNING
-};
+  enum State{
+    DISABLED,
+    IDLE,
+    ERROR,
+    RUNNING
+  };
 
 // Global Variables
-volatile State currentState = DISABLED;
-volatile bool startButtonPressed = false;
-volatile bool resetButtonPressed = false;
-volatile bool stopButtonPressed  = false;
+  volatile State currentState = DISABLED;
+  volatile bool startButtonPressed = false;
+  volatile bool resetButtonPressed = false;
 
-int currentStepperPosition = 0;
-int previousPotValue = 0;
+  int currentStepperPosition = 0;
+  int previousPotValue = 0;
 
-// Millis Variables
-unsigned long currentMillis = 0;
-unsigned long lastLCDUpdate = 0;
-unsigned long lastStart = 0;
-unsigned long lastReset = 0;
-unsigned long lastStop = 0;
+  // Millis Variables
+  unsigned long currentMillis = 0;
+  unsigned long lastLCDUpdate = 0;
+  unsigned long lastStart = 0;
+  unsigned long lastReset = 0;
+  unsigned long lastStop = 0;
 
 void setup(){
   Serial.begin(9600);
@@ -89,10 +89,10 @@ void setup(){
   pinMode(BUTTON_RESET_PIN, INPUT);
   pinMode(BUTTON_STOP_PIN,  INPUT);
 
+  // Component Initialization
   lcd.begin(16, 2);
   dht.begin();
   ventMove.setSpeed(10);
-
   rtc.begin();
 
   if(!rtc.isrunning()){
@@ -109,7 +109,8 @@ void setup(){
 
 void loop(){
   currentMillis = millis();
-  // Check ISR Flag for Start Button
+
+  // Start Button Handling
   if(startButtonPressed){
     startButtonPressed = false;
     if(currentState == DISABLED){
@@ -117,8 +118,9 @@ void loop(){
     }
   }
 
+  // Stop Button Handling
   if(digitalRead(BUTTON_STOP_PIN) == HIGH){
-    if(currentMillis - lastStop >= 1000){
+    if(currentMillis - lastStop >= 100){
       lastStop = currentMillis;
       if(currentState != DISABLED){
         transitionTo(DISABLED);
@@ -126,8 +128,9 @@ void loop(){
     }
   }
 
+  // Reset Button Handling
   if(digitalRead(BUTTON_RESET_PIN) == HIGH){
-    if(currentMillis - lastReset >= 1000){
+    if(currentMillis - lastReset >= 100){
       lastReset = currentMillis;
       resetButtonPressed = true;
     }
@@ -144,21 +147,21 @@ void loop(){
       break;
 
     case IDLE:
-      idleMonitoring();
+      idleHandling();
       break;
 
     case ERROR:
-      errorMonitoring();
+      errorHandling();
       break;
 
     case RUNNING:
-      runningMonitoring();
+      runningHandling();
       break;
   }
 
-// LCD Update (Change back to 60000 after DEBUG)
+  // LCD Update (Change back to 60000 after DEBUG)
   if(currentState != DISABLED && currentState != ERROR){
-    if(currentMillis - lastLCDUpdate >= 600){
+    if(currentMillis - lastLCDUpdate >= 1000){
       lastLCDUpdate = currentMillis;
       float t = dht.readTemperature();
       float h = dht.readHumidity();
@@ -169,146 +172,148 @@ void loop(){
 
 
 // State Functions
-void idleMonitoring() {
-  if(analogRead(WATER_SENSOR_PIN) < 25){
-    transitionTo(ERROR);
-    return;
+  void idleHandling(){
+    if(analogRead(WATER_SENSOR_PIN) < 60){
+      transitionTo(ERROR);
+      return;
+    }
+
+    float t = dht.readTemperature();
+    if(t > 24.0){
+      transitionTo(RUNNING);
+    }
   }
 
-  float t = dht.readTemperature();
-  if(t > 24.0){
-    transitionTo(RUNNING);
+  void errorHandling(){
+    if(resetButtonPressed){
+      resetButtonPressed = false;
+      if(analogRead(WATER_SENSOR_PIN) > 60){
+        transitionTo(IDLE);
+      }
+    }
   }
-}
 
-void errorMonitoring(){
-  if(resetButtonPressed){
-    resetButtonPressed = false;
-    if(analogRead(WATER_SENSOR_PIN) > 25){
+  void runningHandling(){
+    if(analogRead(WATER_SENSOR_PIN) < 60){
+      transitionTo(ERROR);
+      return;
+    }
+
+    float t = dht.readTemperature();
+    if (t <= 24.0){
       transitionTo(IDLE);
     }
   }
-}
 
-void runningMonitoring(){
-  if(analogRead(WATER_SENSOR_PIN) < 25){
-    transitionTo(ERROR);
-    return;
-  }
-
-  float t = dht.readTemperature();
-  if (t <= 24.0){
-    transitionTo(IDLE);
-  }
-}
-
-void transitionTo(State newState){
-  currentState = newState;
-  
-  digitalWrite(LED_YELLOW, LOW);
-  digitalWrite(LED_GREEN, LOW);
-  digitalWrite(LED_RED, LOW);
-  digitalWrite(LED_BLUE, LOW);
-
-  logEvent(newState);
-
-  switch(newState){
-    case DISABLED:
-      digitalWrite(LED_YELLOW, HIGH);
-      setFanMotor(false);
-      lcd.clear();
-      lcd.setCursor(0,0);
-      lcd.print("DISABLED");
-      break;
-
-    case IDLE:
-      digitalWrite(LED_GREEN, HIGH);
-      setFanMotor(false);
-      updateLCD(dht.readTemperature(), dht.readHumidity());
-      break;
-
-    case ERROR:
-      digitalWrite(LED_RED, HIGH);
-      setFanMotor(false);
-      lcd.clear();
-      lcd.setCursor(0,0);
-      lcd.print("ERROR: Low Water");
-      break;
-
-    case RUNNING:
-      digitalWrite(LED_BLUE, HIGH);
-      setFanMotor(true);
-      break;
-  }
-}
-
-void setFanMotor(bool on){
-  if(on){
-    digitalWrite(FAN_ENABLE_PIN, HIGH);
-    digitalWrite(FAN_IN1_PIN, HIGH);
-    digitalWrite(FAN_IN2_PIN, LOW);
-  }
-  else{
-    digitalWrite(FAN_ENABLE_PIN, LOW);
-    digitalWrite(FAN_IN1_PIN, LOW);
-    digitalWrite(FAN_IN2_PIN, LOW);
-  }
-}
-
-void ventControl(){
-  int potVal = analogRead(POTENTIOMETER_PIN);
-  
-  if(abs(potVal - previousPotValue) > 50){
-    int targetPos = map(potVal, 0, 1023, 0, 1278);
-    int stepsToMove = targetPos - currentStepperPosition;
+// State Transition and Helper Functions
+  void transitionTo(State newState){
+    currentState = newState;
     
-    if(stepsToMove != 0){
-      ventMove.step(stepsToMove);
-      currentStepperPosition = targetPos;
-      
-      Serial.print("\nVent position changed to ");
-      Serial.print(currentStepperPosition);
-      Serial.print(" at ");
-      DateTime now = rtc.now();
-      Serial.println(now.timestamp());
+    digitalWrite(LED_YELLOW, LOW);
+    digitalWrite(LED_GREEN,  LOW);
+    digitalWrite(LED_RED,    LOW);
+    digitalWrite(LED_BLUE,   LOW);
+
+    logEvent(newState);
+
+    switch(newState){
+      case DISABLED:
+        digitalWrite(LED_YELLOW, HIGH);
+        setFanMotor(false);
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("Disabled");
+        break;
+
+      case IDLE:
+        digitalWrite(LED_GREEN, HIGH);
+        setFanMotor(false);
+        updateLCD(dht.readTemperature(), dht.readHumidity());
+        break;
+
+      case ERROR:
+        digitalWrite(LED_RED, HIGH);
+        setFanMotor(false);
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("Error: Low Water");
+        break;
+
+      case RUNNING:
+        digitalWrite(LED_BLUE, HIGH);
+        setFanMotor(true);
+        break;
     }
-
-    previousPotValue = potVal;
   }
-}
 
-void updateLCD(float t, float h) {
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Temp:   "); lcd.print(t); lcd.print("C");
-  lcd.setCursor(0, 1);
-  lcd.print("Humid:  "); lcd.print(h); lcd.print("%");
-}
-
-void logEvent(State state) {
-  Serial.print("Transition to ");
-  switch(state){
-    case DISABLED: 
-      Serial.print("DISABLED"); 
-      break;
-
-    case IDLE: 
-      Serial.print("IDLE"); 
-      break;
-
-    case ERROR: 
-      Serial.print("ERROR"); 
-      break;
-
-    case RUNNING: 
-      Serial.print("RUNNING"); 
-      break;
+  void setFanMotor(bool on){
+    if(on){
+      digitalWrite(FAN_ENABLE_PIN, HIGH);
+      digitalWrite(FAN_IN1_PIN,    HIGH);
+      digitalWrite(FAN_IN2_PIN,    LOW);
+    }
+    else{
+      digitalWrite(FAN_ENABLE_PIN, LOW);
+      digitalWrite(FAN_IN1_PIN,    LOW);
+      digitalWrite(FAN_IN2_PIN,    LOW);
+    }
   }
-  Serial.print(" at ");
-  DateTime now = rtc.now();
-  Serial.println(now.timestamp());
-}
 
-void startInterrupt(){
-  startButtonPressed = true;
-}
+  void ventControl(){
+    int potVal = analogRead(POTENTIOMETER_PIN);
+    
+    if(abs(potVal - previousPotValue) > 50){
+      int targetPos = map(potVal, 0, 1023, 0, 1278);
+      int stepsToMove = targetPos - currentStepperPosition;
+      
+      if(stepsToMove != 0){
+        ventMove.step(stepsToMove);
+        currentStepperPosition = targetPos;
+        
+        Serial.print("\nVent position changed to ");
+        Serial.print(currentStepperPosition);
+        Serial.print(" at ");
+        DateTime now = rtc.now();
+        Serial.println(now.timestamp());
+      }
+
+      previousPotValue = potVal;
+    }
+  }
+
+  void updateLCD(float t, float h) {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Temp:   "); lcd.print(t); lcd.print("C");
+    lcd.setCursor(0, 1);
+    lcd.print("Humid:  "); lcd.print(h); lcd.print("%");
+  }
+
+  void logEvent(State state) {
+    Serial.print("Transitioned to ");
+    switch(state){
+      case DISABLED: 
+        Serial.print("disabled"); 
+        break;
+
+      case IDLE: 
+        Serial.print("idle"); 
+        break;
+
+      case ERROR: 
+        Serial.print("error"); 
+        break;
+
+      case RUNNING: 
+        Serial.print("running"); 
+        break;
+    }
+    Serial.print(" at ");
+    DateTime now = rtc.now();
+    Serial.println(now.timestamp());
+  }
+
+// Interrupt
+  void startInterrupt(){
+    startButtonPressed = true;
+  }
