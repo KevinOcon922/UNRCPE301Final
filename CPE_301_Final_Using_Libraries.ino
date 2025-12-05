@@ -1,9 +1,3 @@
-//  ||||| TO FIX |||||
-//  Add stepper motor change threshold / fix stepper jitter
-//  Add button debouncing
-
-//  For prototype: Replace Blue LED (broken)
-
 #include <LiquidCrystal.h>
 #include <Stepper.h>
 #include <DHT.h>
@@ -65,11 +59,17 @@ enum State{
 volatile State currentState = DISABLED;
 volatile bool startButtonPressed = false;
 volatile bool resetButtonPressed = false;
-
-unsigned long lastLCDUpdate = 0;
+volatile bool stopButtonPressed  = false;
 
 int currentStepperPosition = 0;
 int previousPotValue = 0;
+
+// Millis Variables
+unsigned long currentMillis = 0;
+unsigned long lastLCDUpdate = 0;
+unsigned long lastStart = 0;
+unsigned long lastReset = 0;
+unsigned long lastStop = 0;
 
 void setup(){
   Serial.begin(9600);
@@ -108,6 +108,7 @@ void setup(){
 }
 
 void loop(){
+  currentMillis = millis();
   // Check ISR Flag for Start Button
   if(startButtonPressed){
     startButtonPressed = false;
@@ -116,9 +117,20 @@ void loop(){
     }
   }
 
+  if(digitalRead(BUTTON_STOP_PIN) == HIGH){
+    if(currentMillis - lastStop >= 1000){
+      lastStop = currentMillis;
+      if(currentState != DISABLED){
+        transitionTo(DISABLED);
+      }
+    }
+  }
+
   if(digitalRead(BUTTON_RESET_PIN) == HIGH){
-    resetButtonPressed = true;
-    Serial.println("RESET");
+    if(currentMillis - lastReset >= 1000){
+      lastReset = currentMillis;
+      resetButtonPressed = true;
+    }
   }
 
   // Vent Control
@@ -146,7 +158,6 @@ void loop(){
 
 // LCD Update (Change back to 60000 after DEBUG)
   if(currentState != DISABLED && currentState != ERROR){
-    unsigned long currentMillis = millis();
     if(currentMillis - lastLCDUpdate >= 600){
       lastLCDUpdate = currentMillis;
       float t = dht.readTemperature();
@@ -164,11 +175,6 @@ void idleMonitoring() {
     return;
   }
 
-  if(digitalRead(BUTTON_STOP_PIN) == HIGH){
-    transitionTo(DISABLED);
-    return;
-  }
-
   float t = dht.readTemperature();
   if(t > 24.0){
     transitionTo(RUNNING);
@@ -176,11 +182,6 @@ void idleMonitoring() {
 }
 
 void errorMonitoring(){
-  if(digitalRead(BUTTON_STOP_PIN) == HIGH){
-    transitionTo(DISABLED);
-    return;
-  }
-
   if(resetButtonPressed){
     resetButtonPressed = false;
     if(analogRead(WATER_SENSOR_PIN) > 25){
@@ -192,11 +193,6 @@ void errorMonitoring(){
 void runningMonitoring(){
   if(analogRead(WATER_SENSOR_PIN) < 25){
     transitionTo(ERROR);
-    return;
-  }
-
-  if(digitalRead(BUTTON_STOP_PIN) == HIGH){
-    transitionTo(DISABLED);
     return;
   }
 
@@ -278,7 +274,6 @@ void ventControl(){
     }
 
     previousPotValue = potVal;
-
   }
 }
 
@@ -316,5 +311,4 @@ void logEvent(State state) {
 
 void startInterrupt(){
   startButtonPressed = true;
-  Serial.println("START");
 }
