@@ -1,4 +1,4 @@
-CPE 301 Final Project: Water Cooler Sensor
+CPE 301 Final Project: Evaporation Cooling System
 
 Group Number 34
 Members: Kevin O'Connell, Vincent Toney
