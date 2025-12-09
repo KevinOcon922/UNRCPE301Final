@@ -169,7 +169,7 @@ void loop(){
   }
 
   // Stop Button Handling - Read digital pin 4 (BUTTON_STOP_PIN)
-  if((*pin_g & 0x20) == HIGH){
+  if(*pin_g & 0x20){
     if(currentMillis - lastStop >= 100){
       lastStop = currentMillis;
       if(currentState != DISABLED){
@@ -179,7 +179,7 @@ void loop(){
   }
 
   // Reset Button Handling - //Read digial pin 3 (BUTTON_RESET_PIN)
-  if((*pin_e & 0x20) == HIGH){
+  if(*pin_e & 0x20){
     if(currentMillis - lastReset >= 100){
       lastReset = currentMillis;
       resetButtonPressed = true;
