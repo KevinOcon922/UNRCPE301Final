@@ -168,9 +168,7 @@ void loop(){
   if(currentState != DISABLED && currentState != ERROR){
     if(currentMillis - lastLCDUpdate >= 60000){
       lastLCDUpdate = currentMillis;
-      float t = dht.readTemperature();
-      float h = dht.readHumidity();
-      updateLCD(t, h);
+      updateLCD(dht.readTemperature(), dht.readHumidity());
     }
   }
 }
@@ -183,7 +181,7 @@ void idleHandling(){
   }
 
   float t = dht.readTemperature();
-  if(t > 24.0){
+  if(t > 25.0){
     transitionTo(RUNNING);
   }
 }
@@ -204,7 +202,7 @@ void runningHandling(){
   }
 
   float t = dht.readTemperature();
-  if (t <= 24.0){
+  if (t <= 25.0){
     transitionTo(IDLE);
   }
 }
@@ -247,6 +245,7 @@ void transitionTo(State newState){
     case RUNNING:
       *port_a |= 0x08; // Blue HIGH
       setFanMotor(true);
+      updateLCD(dht.readTemperature(), dht.readHumidity());
       break;
   }
 }
