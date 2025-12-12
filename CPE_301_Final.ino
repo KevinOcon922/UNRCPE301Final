@@ -89,11 +89,11 @@ void setup(){
   *ddr_a |= 0x08; // Blue LED, Pin 25
 
   // Input Pins
-  *ddr_e &= ~(0x10);
+  *ddr_e  &= ~(0x10);
   *port_e &= ~(0x10); // Start Button, Pin 2
-  *ddr_e &= ~(0x20);
+  *ddr_e  &= ~(0x20);
   *port_e &= ~(0x20); // Reset Button, Pin 3
-  *ddr_g &= ~(0x20);
+  *ddr_g  &= ~(0x20);
   *port_g &= ~(0x20); // Stop Button, Pin 4
 
   // Component Initialization
@@ -398,10 +398,10 @@ void adc_init(){
 }
 
 unsigned int adc_read(unsigned char adc_channel_num){
-  *my_ADMUX &= 0xE0;
+  *my_ADMUX  &= 0xE0;
   *my_ADCSRB &= 0xF7;
 
-  *my_ADMUX |= (0x1F & adc_channel_num);
+  *my_ADMUX  |= (0x1F & adc_channel_num);
   *my_ADCSRB |= ((adc_channel_num & 0x20) >> 2);
 
   *my_ADCSRA |= 0x40;
